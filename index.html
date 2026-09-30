@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>校园失物招领</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+<h1>校园失物招领</h1>
+<nav>
+<button id="nav-home">首页</button>
+<button id="nav-publish-lost">发布寻物</button>
+<button id="nav-publish-found">发布招领</button>
+<button id="nav-search">搜索</button>
+</nav>
+</header>
+
+<main>
+<!-- 首页：浏览列表 -->
+<section id="page-home" class="page">
+<h2>最新信息</h2>
+<div id="list"></div>
+</section>
+
+<!-- 发布页：寻物 / 招领共用一个表单 -->
+<section id="page-publish" class="page" style="display:none">
+<h2 id="publish-title">发布寻物</h2>
+<label>物品名称 <input id="f-name" placeholder="如：白色保温杯"></label>
+<label>类别 <input id="f-category" placeholder="如：水杯 / 校园卡"></label>
+<label>地点 <input id="f-place" placeholder="如：图书馆三楼"></label>
+<label>时间 <input id="f-time" placeholder="如：9月27日下午"></label>
+<label>特征 <input id="f-feature" placeholder="如：白色、有贴纸"></label>
+<label>联系方式 <input id="f-contact" placeholder="如：QQ 123456（占位）"></label>
+<button id="btn-publish">发布</button>
+<button class="back" data-go="page-home">返回首页</button>
+</section>
+
+<!-- 搜索页 -->
+<section id="page-search" class="page" style="display:none">
+<h2>搜索</h2>
+<input id="s-keyword" placeholder="输入物品名称，如：水杯">
+<button id="btn-search">搜索</button>
+<div id="search-result"></div>
+<button class="back" data-go="page-home">返回首页</button>
+</section>
+
+<!-- 详情页 -->
+<section id="page-detail" class="page" style="display:none">
+<h2>物品详情</h2>
+<div id="detail"></div>
+<button id="btn-contact">联系发布者</button>
+<button id="btn-done">标记已找到 / 已归还</button>
+<button class="back" data-go="page-home">返回首页</button>
+</section>
+
+<!-- 成功 / 提示页 -->
+<section id="page-success" class="page" style="display:none">
+<h2>发布成功</h2>
+<p>信息已保存，可在首页看到。</p>
+<button class="back" data-go="page-home">返回首页</button>
+</section>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>

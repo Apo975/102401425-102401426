@@ -1,0 +1,9 @@
+body { font-family: "Microsoft YaHei", sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; background: #f5f5f5; }
+header { background: #fff; padding: 12px; border-radius: 8px; margin-bottom: 12px; }
+nav button { margin-right: 8px; }
+.page { background: #fff; padding: 16px; border-radius: 8px; }
+label { display: block; margin: 8px 0; }
+input { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+button { padding: 8px 16px; margin: 8px 4px 0 0; cursor: pointer; }
+.card { border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin: 8px 0; cursor: pointer; }
+.card .status { color: #888; font-size: 14px; }
