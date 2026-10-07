@@ -102,6 +102,14 @@ test('空白名称拒绝发布且保留输入', async () => {
   const b = await boot(); b.fill({ ...base, name: ' ' });
   assert.equal(await b.c.doPublish(), null); assert.equal(b.c.items.length, 0); assert.equal(b.el('f-place').value, '图书馆');
 });
+test('日期时间控件的值按本地时间保存和展示，旧时间文字保留', async () => {
+  const b = await boot({ raw: JSON.stringify([base]) }); b.fill({ ...base, time: '2026-10-07T18:30' });
+  const item = await b.c.doPublish(); assert.equal(item.time, '2026-10-07 18:30');
+  b.c.openDetail(item.id); assert.equal(b.el('d-time').textContent, '2026-10-07 18:30');
+  const restored = await boot({ raw: b.store.lost_items });
+  assert.equal(restored.c.items.find(x => x.id === item.id).time, '2026-10-07 18:30');
+  assert.equal(restored.c.items.find(x => x.id === 'old').time, base.time);
+});
 test('状态更新后详情、搜索筛选及持久化保持一致', async () => {
   const b = await boot({ raw: JSON.stringify([base]) }); b.c.searchStatus = '进行中'; b.c.doSearch();
   assert.equal(b.el('search-result').children.length, 1); b.c.openDetail('old'); assert.equal(await b.c.markDone(), true);

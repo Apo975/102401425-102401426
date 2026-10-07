@@ -64,7 +64,7 @@
 <option value="其他"></option>
 </datalist>
 <label class="fld"><span id="label-place">丢失地点</span> <span class="required-mark" aria-hidden="true">*</span><input id="f-place" required maxlength="120" aria-labelledby="label-place" aria-describedby="hint-place" placeholder="如：西一教学楼一楼走廊"><small class="field-hint" id="hint-place">必填，最多 120 字</small></label>
-<label class="fld"><span id="label-time">丢失时间</span> <span class="required-mark" aria-hidden="true">*</span><input id="f-time" required maxlength="80" aria-labelledby="label-time" aria-describedby="hint-time" placeholder="如：9月26日 18:30"><small class="field-hint" id="hint-time">必填，最多 80 字</small></label>
+<label class="fld"><span id="label-time">丢失时间</span> <span class="required-mark" aria-hidden="true">*</span><input id="f-time" type="datetime-local" required step="60" aria-labelledby="label-time" aria-describedby="hint-time"><small class="field-hint" id="hint-time">必填，请选择日期和时间（精确到分钟）</small></label>
 <label class="fld">物品特征（选填）<textarea id="f-feature" rows="3" maxlength="1000" aria-label="物品特征" aria-describedby="hint-feature" placeholder="如：黑色三折伞，伞柄有蓝色挂绳。"></textarea><small class="field-hint" id="hint-feature">最多 1000 字</small></label>
 <label class="fld">联系方式 <span class="required-mark" aria-hidden="true">*</span><input id="f-contact" required maxlength="200" aria-label="联系方式" aria-describedby="hint-contact" placeholder="如：QQ 123456"><small class="field-hint" id="hint-contact">必填，最多 200 字</small></label>
 <button class="btn-primary" id="btn-publish">发布信息</button>

@@ -199,6 +199,8 @@ async function doPublish() {
   if (!identity || storageError) { notify('当前无法保存，请先恢复数据或浏览器存储'); return null; }
   var data = { type: currentType };
   Object.keys(Core.limits).forEach(function (key) { data[key] = el('f-' + key).value.trim(); });
+  // 保留用户选择的本地时间，不转换时区；列表和详情显示为日期 + 时间。
+  data.time = data.time.replace('T', ' ');
   var error = Core.validatePublish(data); if (error) { notify(error); return null; }
   busy = true; updateControls();
   try {
