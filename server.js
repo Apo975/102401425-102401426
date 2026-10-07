@@ -3,12 +3,12 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const Core = require('./core');
+const Core = require('./assets/core');
 
 function createServer({ dataFile = path.join(__dirname, 'data', 'items.json') } = {}) {
   // 数据损坏时启动失败，绝不静默清空或覆盖。
   let items = fs.existsSync(dataFile) ? Core.parseItems(fs.readFileSync(dataFile, 'utf8')) : [];
-  const publicFiles = { '/': 'index.html', '/index.html': 'index.html', '/style.css': 'style.css', '/core.js': 'core.js', '/app.js': 'app.js' };
+  const publicFiles = { '/': 'index.html', '/index.html': 'index.html', '/assets/style.css': 'assets/style.css', '/assets/core.js': 'assets/core.js', '/assets/app.js': 'assets/app.js' };
   const types = { '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript' };
   function persist(next) {
     fs.mkdirSync(path.dirname(dataFile), { recursive: true });

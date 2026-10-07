@@ -1,7 +1,7 @@
 'use strict';
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const Core = require('../core');
+const Core = require('../assets/core');
 const base = { type: '寻物', name: '蓝色水杯', category: '日用品', place: '图书馆', time: '9月26日', feature: 'ABC', contact: 'QQ 123' };
 test('合法寻物和招领均通过校验', () => {
   assert.equal(Core.validatePublish(base), null);
