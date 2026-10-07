@@ -1,9 +1,12 @@
 'use strict';
 var items = [], currentType = '寻物', homeTab = '寻物', currentId = null;
 var searchType = '全部', searchStatus = '全部', visiblePage = 'page-home';
+var detailOrigin = { page: 'page-home', scrollY: 0 };
 var shared = location.protocol === 'http:' || location.protocol === 'https:';
 var identity = '', storageError = false, visitor = false, loading = true;
+var dataLoadFailed = false;
 var busy = false, refreshPromise = null, Core = LostFound;
+var REQUEST_TIMEOUT_MS = 10000;
 function el(id) { return document.getElementById(id); }
 function notify(message) { el('notice').textContent = message; el('notice').hidden = !message; }
 function makeNode(tag, cls, text) {
@@ -18,14 +21,25 @@ function decorateLocal(data) {
 }
 function readLocal() { return decorateLocal(Core.parseItems(localStorage.getItem('lost_items'))); }
 async function request(path, method, data) {
-  var response = await fetch(path, {
-    method: method || 'GET', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'X-Publisher-Token': identity },
-    body: data === undefined ? undefined : JSON.stringify(data)
-  });
-  var result = await response.json();
-  if (!response.ok) throw new Error(result.error || '操作失败');
-  return result;
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
+  try {
+    var response = await fetch(path, {
+      method: method || 'GET', cache: 'no-store', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'X-Publisher-Token': identity },
+      body: data === undefined ? undefined : JSON.stringify(data)
+    });
+    // 超时也覆盖响应体读取，避免只收到响应头后一直等待。
+    var result = await response.json();
+    if (!response.ok) throw new Error(result.error || '操作失败');
+    return result;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      var timeout = new Error('请求超过 10 秒，请检查网络或服务');
+      timeout.name = 'RequestTimeoutError'; throw timeout;
+    }
+    throw error;
+  } finally { clearTimeout(timer); }
 }
 function persistLocal(next) {
   if (storageError) throw new Error('本地数据读取异常，已停止写入，请先按 README 备份并恢复数据');
@@ -37,6 +51,9 @@ function persistLocal(next) {
 }
 function updateControls() {
   el('btn-publish').disabled = loading || busy || storageError || visitor || !identity;
+  Object.keys(Core.limits).forEach(function (key) { el('f-' + key).disabled = busy; });
+  el('seg-lost').disabled = busy;
+  el('seg-found').disabled = busy;
   el('mode-text').textContent = (shared ? '共享服务模式' : '本地演示模式（仅此浏览器）') + (visitor ? ' · 访客预览' : ' · 当前发布者');
   el('visitor-toggle').textContent = visitor ? '返回发布者' : '访客预览';
   el('visitor-toggle').disabled = loading || busy;
@@ -61,7 +78,12 @@ function card(item) {
 function renderList() {
   var box = el('list'); box.replaceChildren();
   var list = Core.filterItems(items, { type: homeTab, mine: el('my-only').checked });
-  if (!list.length) box.appendChild(makeNode('p', 'subtitle', loading ? '正在加载…' : '暂无信息，快来发布第一条吧。'));
+  if (!list.length) {
+    var message = loading ? '正在加载…' : dataLoadFailed ? '信息读取失败，请点击顶部刷新重试。'
+      : el('my-only').checked ? '你还没有发布' + homeTab + '信息，取消“只看我的发布”可浏览其他信息。'
+      : '暂无' + homeTab + '信息，快来发布第一条吧。';
+    box.appendChild(makeNode('p', 'subtitle', message));
+  }
   list.forEach(function (item) { box.appendChild(card(item)); });
 }
 function fillSelect(id, key) {
@@ -80,8 +102,23 @@ function doSearch() {
   var kw = el('s-keyword').value.trim();
   var result = filterItems(kw, searchType, searchStatus), box = el('search-result'); box.replaceChildren();
   el('search-tip').hidden = result.length !== 0;
+  el('search-empty-title').textContent = loading ? '正在加载信息' : dataLoadFailed ? '信息读取失败'
+    : !items.length ? '尚无人发布信息' : '当前条件没有匹配的信息';
+  el('search-empty-text').textContent = loading ? '请稍候。' : dataLoadFailed ? '请检查服务或存储，点击顶部刷新重试。'
+    : !items.length ? '先发布一条寻物或招领信息，再来浏览和搜索。'
+    : '可以更换关键词，或点击“清除全部筛选”浏览所有信息。';
   el('search-count').textContent = kw ? '找到 ' + result.length + ' 条与“' + kw + '”相关的信息' : '共 ' + result.length + ' 条信息';
   result.forEach(function (item) { box.appendChild(card(item)); }); return result;
+}
+function resetSearch() {
+  el('s-keyword').value = ''; searchType = '全部'; searchStatus = '全部';
+  el('filter-category').value = ''; el('filter-place').value = '';
+  ['filter-type', 'filter-status'].forEach(function (id) {
+    el(id).querySelectorAll('.pill').forEach(function (button) {
+      button.classList.toggle('active', button.getAttribute('data-v') === '全部');
+    });
+  });
+  return doSearch();
 }
 function renderDetail() {
   var item = items.find(function (x) { return x.id === currentId; });
@@ -95,21 +132,34 @@ function renderDetail() {
   el('d-category').textContent = item.category || '未填写'; el('d-feature').textContent = item.feature || '未填写';
   el('btn-done').textContent = isDone(item) ? '已处理' : item.type === '寻物' ? '标记为已找到' : '标记为已归还';
   el('owner-tip').textContent = owns(item) ? '这是你的发布，你可以更新处理状态。' : '只有原发布者可以更新状态。';
+  el('detail-return').textContent = detailOrigin.page === 'page-search' ? '返回搜索结果' : '返回首页';
   updateControls(); return true;
 }
 function refreshViews() {
   fillSelect('filter-category', 'category'); fillSelect('filter-place', 'place'); renderList(); doSearch();
-  if (currentId) { var exists = renderDetail(); if (exists && visiblePage === 'page-contact') doContact(); }
+  if (currentId) {
+    var exists = renderDetail();
+    if (exists && visiblePage === 'page-contact') {
+      // 后台刷新只更新文字，保留当前页面和滚动位置。
+      el('contact-text').textContent = items.find(function (item) { return item.id === currentId; }).contact;
+    }
+  }
   updateControls();
 }
-function show(id) {
+function show(id, scrollY) {
   if (id === 'page-detail' && !renderDetail()) return;
   if (id === 'page-search') doSearch();
   if (id === 'page-home') renderList();
   document.querySelectorAll('.page').forEach(function (page) { page.style.display = page.id === id ? 'block' : 'none'; });
-  visiblePage = id; window.scrollTo(0, 0);
+  visiblePage = id; window.scrollTo(0, scrollY === undefined ? 0 : scrollY);
 }
-function openDetail(id) { currentId = String(id); show('page-detail'); }
+function openDetail(id) {
+  if (visiblePage === 'page-home' || visiblePage === 'page-search') {
+    detailOrigin = { page: visiblePage, scrollY: window.scrollY || 0 };
+  }
+  currentId = String(id); show('page-detail');
+}
+function returnFromDetail() { show(detailOrigin.page, detailOrigin.scrollY); }
 function doContact() {
   var item = items.find(function (x) { return x.id === currentId; });
   if (!item) { notify('信息已不存在'); return; }
@@ -133,12 +183,13 @@ async function reloadItems() {
   refreshPromise = (async function () {
     try {
       items = shared ? await request('/api/items') : readLocal();
-      storageError = false; loading = false; refreshViews();
+      storageError = false; dataLoadFailed = false; loading = false; refreshViews();
       if (el('notice').textContent.startsWith('读取失败')) notify('');
     } catch (error) {
+      dataLoadFailed = true;
       if (!shared) storageError = true;
       notify('读取失败：' + error.message + '。原数据未覆盖，请检查服务或按 README 恢复。');
-    } finally { loading = false; updateControls(); }
+    } finally { loading = false; renderList(); doSearch(); updateControls(); }
   })();
   try { await refreshPromise; } finally { refreshPromise = null; }
 }
@@ -148,6 +199,8 @@ async function doPublish() {
   if (!identity || storageError) { notify('当前无法保存，请先恢复数据或浏览器存储'); return null; }
   var data = { type: currentType };
   Object.keys(Core.limits).forEach(function (key) { data[key] = el('f-' + key).value.trim(); });
+  // 保留用户选择的本地时间，不转换时区；列表和详情显示为日期 + 时间。
+  data.time = data.time.replace('T', ' ');
   var error = Core.validatePublish(data); if (error) { notify(error); return null; }
   busy = true; updateControls();
   try {
@@ -157,13 +210,18 @@ async function doPublish() {
     else {
       var latest = readLocal();
       published = Object.assign(Core.normalizePublish(data), { id: crypto.randomUUID(), ownerId: identity,
-        createdAt: Date.now(), status: currentType === '寻物' ? '寻找中' : '待认领', isOwner: true });
+        createdAt: Date.now(), status: data.type === '寻物' ? '寻找中' : '待认领', isOwner: true });
       persistLocal([published].concat(latest));
     }
     if (shared) items = [published].concat(items);
     Object.keys(Core.limits).forEach(function (key) { el('f-' + key).value = ''; });
-    homeTab = currentType; updateTabs(); refreshViews(); notify(''); show('page-success'); return published;
-  } catch (error) { notify('发布失败：' + error.message + '。输入已保留，请重试。'); return null; }
+    homeTab = published.type; updateTabs(); refreshViews(); notify(''); show('page-success'); return published;
+  } catch (error) {
+    notify(error.name === 'RequestTimeoutError'
+      ? '发布结果未确认：' + error.message + '。输入已保留，请先刷新列表核对是否已发布，避免重复提交。'
+      : '发布失败：' + error.message + '。输入已保留，请重试。');
+    return null;
+  }
   finally { busy = false; updateControls(); }
 }
 async function markDone() {
@@ -184,10 +242,16 @@ async function markDone() {
       persistLocal(latest.map(function (x) { return x.id === item.id ? Object.assign({}, x, { status: status }) : x; }));
     }
     refreshViews(); el('done-title').textContent = '已标记为' + status; notify(''); show('page-done'); return true;
-  } catch (error) { notify('更新失败：' + error.message); return false; }
+  } catch (error) {
+    notify(error.name === 'RequestTimeoutError'
+      ? '更新结果未确认：' + error.message + '。请先刷新核对最新状态。'
+      : '更新失败：' + error.message);
+    return false;
+  }
   finally { busy = false; updateControls(); }
 }
 function setPublishType(type) {
+  if (busy) return;
   currentType = type; var lost = type === '寻物';
   el('publish-title').textContent = lost ? '发布寻物' : '发布招领';
   el('seg-lost').className = 'seg-btn' + (lost ? ' active' : ''); el('seg-found').className = 'seg-btn' + (!lost ? ' active' : '');
@@ -204,8 +268,10 @@ el('home-publish').onclick = function () { setPublishType(homeTab); show('page-p
 el('hero-search').onclick = function () { show('page-search'); };
 el('btn-publish').onclick = doPublish; el('btn-search').onclick = doSearch; el('btn-contact').onclick = doContact;
 el('btn-copy').onclick = copyContact; el('btn-done').onclick = markDone;
+el('detail-back').onclick = returnFromDetail; el('detail-return').onclick = returnFromDetail;
 el('btn-again').onclick = function () { show('page-publish'); }; el('my-only').onchange = renderList;
 el('filter-category').onchange = doSearch; el('filter-place').onchange = doSearch;
+el('reset-search').onclick = resetSearch;
 el('s-keyword').onkeydown = function (event) { if (event.key === 'Enter') doSearch(); };
 el('visitor-toggle').onclick = function () {
   if (busy) return; visitor = !visitor; el('my-only').checked = false; refreshViews();
