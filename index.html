@@ -84,9 +84,10 @@
 <button class="pill" data-v="已处理">已处理</button>
 </div>
 <div class="select-filters"><label>物品类别<select id="filter-category"><option value="">全部</option></select></label><label>地点<select id="filter-place"><option value="">全部</option></select></label></div>
+<button class="btn-ghost" id="reset-search" type="button">清除全部筛选</button>
 <div class="tip-card" id="search-tip">
-<div class="tip-title"><span class="tip-icon">Q</span>找不到？试试换个关键词</div>
-<p class="tip-text">可以同时输入物品名称和地点，比如“水杯 图书馆”。</p>
+<div class="tip-title"><span class="tip-icon">Q</span><span id="search-empty-title"></span></div>
+<p class="tip-text" id="search-empty-text"></p>
 </div>
 <div id="search-count" class="count"></div>
 <div id="search-result"></div>

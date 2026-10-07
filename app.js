@@ -3,6 +3,7 @@ var items = [], currentType = '寻物', homeTab = '寻物', currentId = null;
 var searchType = '全部', searchStatus = '全部', visiblePage = 'page-home';
 var shared = location.protocol === 'http:' || location.protocol === 'https:';
 var identity = '', storageError = false, visitor = false, loading = true;
+var dataLoadFailed = false;
 var busy = false, refreshPromise = null, Core = LostFound;
 var REQUEST_TIMEOUT_MS = 10000;
 function el(id) { return document.getElementById(id); }
@@ -76,7 +77,12 @@ function card(item) {
 function renderList() {
   var box = el('list'); box.replaceChildren();
   var list = Core.filterItems(items, { type: homeTab, mine: el('my-only').checked });
-  if (!list.length) box.appendChild(makeNode('p', 'subtitle', loading ? '正在加载…' : '暂无信息，快来发布第一条吧。'));
+  if (!list.length) {
+    var message = loading ? '正在加载…' : dataLoadFailed ? '信息读取失败，请点击顶部刷新重试。'
+      : el('my-only').checked ? '你还没有发布' + homeTab + '信息，取消“只看我的发布”可浏览其他信息。'
+      : '暂无' + homeTab + '信息，快来发布第一条吧。';
+    box.appendChild(makeNode('p', 'subtitle', message));
+  }
   list.forEach(function (item) { box.appendChild(card(item)); });
 }
 function fillSelect(id, key) {
@@ -95,8 +101,23 @@ function doSearch() {
   var kw = el('s-keyword').value.trim();
   var result = filterItems(kw, searchType, searchStatus), box = el('search-result'); box.replaceChildren();
   el('search-tip').hidden = result.length !== 0;
+  el('search-empty-title').textContent = loading ? '正在加载信息' : dataLoadFailed ? '信息读取失败'
+    : !items.length ? '尚无人发布信息' : '当前条件没有匹配的信息';
+  el('search-empty-text').textContent = loading ? '请稍候。' : dataLoadFailed ? '请检查服务或存储，点击顶部刷新重试。'
+    : !items.length ? '先发布一条寻物或招领信息，再来浏览和搜索。'
+    : '可以更换关键词，或点击“清除全部筛选”浏览所有信息。';
   el('search-count').textContent = kw ? '找到 ' + result.length + ' 条与“' + kw + '”相关的信息' : '共 ' + result.length + ' 条信息';
   result.forEach(function (item) { box.appendChild(card(item)); }); return result;
+}
+function resetSearch() {
+  el('s-keyword').value = ''; searchType = '全部'; searchStatus = '全部';
+  el('filter-category').value = ''; el('filter-place').value = '';
+  ['filter-type', 'filter-status'].forEach(function (id) {
+    el(id).querySelectorAll('.pill').forEach(function (button) {
+      button.classList.toggle('active', button.getAttribute('data-v') === '全部');
+    });
+  });
+  return doSearch();
 }
 function renderDetail() {
   var item = items.find(function (x) { return x.id === currentId; });
@@ -154,12 +175,13 @@ async function reloadItems() {
   refreshPromise = (async function () {
     try {
       items = shared ? await request('/api/items') : readLocal();
-      storageError = false; loading = false; refreshViews();
+      storageError = false; dataLoadFailed = false; loading = false; refreshViews();
       if (el('notice').textContent.startsWith('读取失败')) notify('');
     } catch (error) {
+      dataLoadFailed = true;
       if (!shared) storageError = true;
       notify('读取失败：' + error.message + '。原数据未覆盖，请检查服务或按 README 恢复。');
-    } finally { loading = false; updateControls(); }
+    } finally { loading = false; renderList(); doSearch(); updateControls(); }
   })();
   try { await refreshPromise; } finally { refreshPromise = null; }
 }
@@ -238,6 +260,7 @@ el('btn-publish').onclick = doPublish; el('btn-search').onclick = doSearch; el('
 el('btn-copy').onclick = copyContact; el('btn-done').onclick = markDone;
 el('btn-again').onclick = function () { show('page-publish'); }; el('my-only').onchange = renderList;
 el('filter-category').onchange = doSearch; el('filter-place').onchange = doSearch;
+el('reset-search').onclick = resetSearch;
 el('s-keyword').onkeydown = function (event) { if (event.key === 'Enter') doSearch(); };
 el('visitor-toggle').onclick = function () {
   if (busy) return; visitor = !visitor; el('my-only').checked = false; refreshViews();

@@ -14,6 +14,11 @@ async function boot({ raw = '[]', failRead = false, failWrite = false, clipboard
   class Node {
     constructor(tag = 'div') { this.tagName = tag; this.children = []; this.value = ''; this.textContent = ''; this.style = {}; this.hidden = false; this.checked = false; this.disabled = false; this.className = ''; }
     get options() { return this.children; }
+    getAttribute(name) { return this[name] ?? null; }
+    get classList() { return { toggle: (name, enabled) => {
+      const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+      if (enabled) classes.add(name); else classes.delete(name); this.className = [...classes].join(' ');
+    } }; }
     appendChild(node) { this.children.push(node); node.parent = this; return node; }
     replaceChildren() { this.children = []; }
     querySelectorAll() { return []; }
@@ -22,6 +27,13 @@ async function boot({ raw = '[]', failRead = false, failWrite = false, clipboard
   }
   const nodes = new Map();
   for (const match of html.matchAll(/id="([^"]+)"/g)) { const node = new Node(); node.id = match[1]; nodes.set(node.id, node); }
+  for (const id of ['filter-type', 'filter-status']) {
+    const group = html.match(new RegExp('<div class="pills" id="' + id + '">([\\s\\S]*?)</div>'))[1];
+    const buttons = [...group.matchAll(/<button class="([^"]+)" data-v="([^"]+)"/g)].map(match => {
+      const button = new Node('button'); button.className = match[1]; button['data-v'] = match[2]; return button;
+    });
+    nodes.get(id).querySelectorAll = () => buttons;
+  }
   const store = { lost_items: raw, lost_publisher_token: identity }, events = {};
   const context = {
     LostFound: Core, crypto, AbortController,
@@ -216,4 +228,39 @@ test('响应头返回后响应体一直挂起也会超时', async () => {
   timers.expire();
   await assert.rejects(pending, error => error.name === 'RequestTimeoutError');
   assert.equal(timers.pending.size, 0);
+});
+test('空数据与筛选无匹配使用不同提示，重置不会生成数据', async () => {
+  const empty = await boot(); empty.c.doSearch();
+  assert.equal(empty.el('search-empty-title').textContent, '尚无人发布信息');
+  empty.el('reset-search').onclick(); assert.equal(empty.c.items.length, 0);
+  const b = await boot({ raw: JSON.stringify([base]) }); b.el('s-keyword').value = '不存在'; b.c.doSearch();
+  assert.equal(b.el('search-empty-title').textContent, '当前条件没有匹配的信息');
+  assert.equal(b.el('search-tip').hidden, false); assert.equal(b.el('search-result').children.length, 0);
+});
+test('清除筛选重置关键词、类型、状态、类别、地点及按钮高亮', async () => {
+  const b = await boot({ raw: JSON.stringify([base, { ...base, id: 'found', type: '招领', status: '已归还' }]) });
+  b.el('s-keyword').value = '不存在'; b.el('filter-category').value = '日用品'; b.el('filter-place').value = '图书馆';
+  b.el('filter-type').querySelectorAll('.pill')[2].onclick();
+  b.el('filter-status').querySelectorAll('.pill')[1].onclick();
+  const originalData = b.store.lost_items; b.el('reset-search').onclick();
+  assert.equal(b.el('s-keyword').value, ''); assert.equal(b.c.searchType, '全部'); assert.equal(b.c.searchStatus, '全部');
+  assert.equal(b.el('filter-category').value, ''); assert.equal(b.el('filter-place').value, '');
+  for (const id of ['filter-type', 'filter-status']) {
+    const active = b.el(id).querySelectorAll('.pill').filter(button => button.className.split(' ').includes('active'));
+    assert.equal(active.length, 1); assert.equal(active[0].getAttribute('data-v'), '全部');
+  }
+  assert.equal(b.el('search-result').children.length, 2); assert.equal(b.el('search-tip').hidden, true);
+  assert.equal(b.store.lost_items, originalData);
+});
+test('读取失败不会误报无人发布，恢复后显示正常空列表提示', async () => {
+  const b = await boot({ raw: '{broken' });
+  assert.equal(b.el('search-empty-title').textContent, '信息读取失败');
+  assert.match(b.el('list').children[0].textContent, /读取失败/);
+  b.store.lost_items = '[]'; await b.c.reloadItems();
+  assert.equal(b.el('search-empty-title').textContent, '尚无人发布信息');
+});
+test('只看我的发布为空时提示取消筛选，不误报整个列表为空', async () => {
+  const b = await boot({ raw: JSON.stringify([{ ...base, ownerId: 'b'.repeat(64) }]) });
+  b.el('my-only').checked = true; b.c.renderList();
+  assert.match(b.el('list').children[0].textContent, /取消“只看我的发布”/);
 });
