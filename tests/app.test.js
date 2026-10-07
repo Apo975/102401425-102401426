@@ -134,3 +134,23 @@ test('另一个标签页写入后 storage 事件刷新列表与详情', async ()
   b.events.storage({ key: 'lost_items' }); await b.c.reloadItems();
   assert.equal(b.el('d-status').textContent, '已找到');
 });
+test('联系页反复刷新只更新内容，保留滚动位置；主动切页仍回到顶部', async () => {
+  const b = await boot({ raw: JSON.stringify([base]) });
+  let scrollY = 150, scrollCalls = 0;
+  b.c.window.scrollTo = (x, y) => { scrollY = y; scrollCalls++; };
+  b.c.openDetail('old'); b.c.doContact();
+  assert.equal(scrollY, 0); assert.equal(scrollCalls, 2);
+  scrollY = 150; scrollCalls = 0;
+  b.store.lost_items = JSON.stringify([{ ...base, contact: '新的联系方式', status: '已找到' }]);
+  await b.c.reloadItems(); await b.c.reloadItems();
+  assert.equal(b.c.visiblePage, 'page-contact'); assert.equal(scrollY, 150); assert.equal(scrollCalls, 0);
+  assert.equal(b.el('contact-text').textContent, '新的联系方式');
+  assert.equal(b.el('d-status').textContent, '已找到');
+  b.c.show('page-detail'); assert.equal(scrollY, 0); assert.equal(scrollCalls, 1);
+});
+test('联系页对应信息被移除时安全返回首页', async () => {
+  const b = await boot({ raw: JSON.stringify([base]) }); b.c.openDetail('old'); b.c.doContact();
+  b.store.lost_items = '[]'; await b.c.reloadItems();
+  assert.equal(b.c.visiblePage, 'page-home'); assert.equal(b.c.currentId, null);
+  assert.match(b.el('notice').textContent, /信息已不存在/);
+});

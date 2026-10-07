@@ -102,7 +102,13 @@ function renderDetail() {
 }
 function refreshViews() {
   fillSelect('filter-category', 'category'); fillSelect('filter-place', 'place'); renderList(); doSearch();
-  if (currentId) { var exists = renderDetail(); if (exists && visiblePage === 'page-contact') doContact(); }
+  if (currentId) {
+    var exists = renderDetail();
+    if (exists && visiblePage === 'page-contact') {
+      // 后台刷新只更新文字，保留当前页面和滚动位置。
+      el('contact-text').textContent = items.find(function (item) { return item.id === currentId; }).contact;
+    }
+  }
   updateControls();
 }
 function show(id) {
