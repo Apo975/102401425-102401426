@@ -272,7 +272,8 @@ el('hero-search').onclick = function () { show('page-search'); };
 el('btn-publish').onclick = doPublish; el('btn-search').onclick = doSearch; el('btn-contact').onclick = doContact;
 el('btn-copy').onclick = copyContact; el('btn-done').onclick = markDone;
 el('detail-back').onclick = returnFromDetail; el('detail-return').onclick = returnFromDetail;
-el('btn-again').onclick = function () { show('page-publish'); }; el('my-only').onchange = renderList;
+function clearPublishForm() { Object.keys(Core.limits).forEach(function (key) { el('f-' + key).value = ''; }); }
+el('btn-again').onclick = function () { clearPublishForm(); show('page-publish'); }; el('my-only').onchange = renderList;
 el('filter-category').onchange = doSearch; el('filter-place').onchange = doSearch;
 el('reset-search').onclick = resetSearch;
 el('s-keyword').onkeydown = function (event) { if (event.key === 'Enter') doSearch(); };
