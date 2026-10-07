@@ -53,7 +53,16 @@
 <button id="seg-found" class="seg-btn">发布招领</button>
 </div>
 <label class="fld">物品名称 <span class="required-mark" aria-hidden="true">*</span><input id="f-name" required maxlength="80" aria-label="物品名称" aria-describedby="hint-name" placeholder="如：黑色折叠伞"><small class="field-hint" id="hint-name">必填，最多 80 字</small></label>
-<label class="fld">物品类别（选填）<input id="f-category" maxlength="40" aria-label="物品类别" aria-describedby="hint-category" placeholder="如：日常用品"><small class="field-hint" id="hint-category">最多 40 字</small></label>
+<label class="fld">物品类别（选填）<input id="f-category" list="category-options" maxlength="40" aria-label="物品类别" aria-describedby="hint-category" placeholder="选择常用类别或自行填写"><small class="field-hint" id="hint-category">建议选择常用类别，方便筛选；也可自填，最多 40 字</small></label>
+<datalist id="category-options">
+<option value="日用品"></option>
+<option value="证件卡片"></option>
+<option value="电子设备"></option>
+<option value="学习用品"></option>
+<option value="衣物配饰"></option>
+<option value="钥匙"></option>
+<option value="其他"></option>
+</datalist>
 <label class="fld"><span id="label-place">丢失地点</span> <span class="required-mark" aria-hidden="true">*</span><input id="f-place" required maxlength="120" aria-labelledby="label-place" aria-describedby="hint-place" placeholder="如：西一教学楼一楼走廊"><small class="field-hint" id="hint-place">必填，最多 120 字</small></label>
 <label class="fld"><span id="label-time">丢失时间</span> <span class="required-mark" aria-hidden="true">*</span><input id="f-time" required maxlength="80" aria-labelledby="label-time" aria-describedby="hint-time" placeholder="如：9月26日 18:30"><small class="field-hint" id="hint-time">必填，最多 80 字</small></label>
 <label class="fld">物品特征（选填）<textarea id="f-feature" rows="3" maxlength="1000" aria-label="物品特征" aria-describedby="hint-feature" placeholder="如：黑色三折伞，伞柄有蓝色挂绳。"></textarea><small class="field-hint" id="hint-feature">最多 1000 字</small></label>
