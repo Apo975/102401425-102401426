@@ -10,7 +10,7 @@ const code = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
 const html = fs.readFileSync(path.join(__dirname, '../index.html'), 'utf8');
 const identity = 'a'.repeat(64);
 const base = { id: 'old', ownerId: identity, createdAt: 1, type: '寻物', name: '水杯', category: '日用品', place: '图书馆', time: '今天', feature: '蓝色', contact: '测试联系方式', status: '寻找中' };
-async function boot({ raw = '[]', failRead = false, failWrite = false, clipboard, execCopy = false } = {}) {
+async function boot({ raw = '[]', failRead = false, failWrite = false, clipboard, execCopy = false, timers } = {}) {
   class Node {
     constructor(tag = 'div') { this.tagName = tag; this.children = []; this.value = ''; this.textContent = ''; this.style = {}; this.hidden = false; this.checked = false; this.disabled = false; this.className = ''; }
     get options() { return this.children; }
@@ -24,7 +24,10 @@ async function boot({ raw = '[]', failRead = false, failWrite = false, clipboard
   for (const match of html.matchAll(/id="([^"]+)"/g)) { const node = new Node(); node.id = match[1]; nodes.set(node.id, node); }
   const store = { lost_items: raw, lost_publisher_token: identity }, events = {};
   const context = {
-    LostFound: Core, crypto, location: { protocol: 'file:' }, navigator: { clipboard },
+    LostFound: Core, crypto, AbortController,
+    setTimeout: timers ? timers.setTimeout : setTimeout,
+    clearTimeout: timers ? timers.clearTimeout : clearTimeout,
+    location: { protocol: 'file:' }, navigator: { clipboard },
     localStorage: { getItem(key) { if (failRead) throw new Error('不可读'); return store[key] ?? null; },
       setItem(key, value) { if (failWrite) throw new Error('容量不足'); store[key] = value; } },
     document: { hidden: false, body: new Node('body'), createElement(tag) { return new Node(tag); },
@@ -153,4 +156,64 @@ test('联系页对应信息被移除时安全返回首页', async () => {
   b.store.lost_items = '[]'; await b.c.reloadItems();
   assert.equal(b.c.visiblePage, 'page-home'); assert.equal(b.c.currentId, null);
   assert.match(b.el('notice').textContent, /信息已不存在/);
+});
+function controlledTimers() {
+  const pending = new Map(); let sequence = 0;
+  return {
+    pending,
+    setTimeout(callback, delay) { assert.equal(delay, 10000); const id = ++sequence; pending.set(id, callback); return id; },
+    clearTimeout(id) { pending.delete(id); },
+    expire() { assert.equal(pending.size, 1); pending.values().next().value(); }
+  };
+}
+function waitForAbort(signal) {
+  return new Promise((resolve, reject) => signal.addEventListener('abort', () => {
+    const error = new Error('请求已取消'); error.name = 'AbortError'; reject(error);
+  }, { once: true }));
+}
+test('发布超时解除锁定并保留输入，提示核对结果且不自动重发', async () => {
+  const timers = controlledTimers(), b = await boot({ timers }); b.fill(); b.c.shared = true;
+  let calls = 0, signal;
+  b.c.fetch = (url, options) => { calls++; signal = options.signal; return waitForAbort(signal); };
+  const pending = b.c.doPublish(); assert.equal(b.el('f-name').disabled, true);
+  timers.expire(); assert.equal(await pending, null);
+  assert.equal(signal.aborted, true); assert.equal(calls, 1); assert.equal(timers.pending.size, 0);
+  assert.equal(b.c.busy, false); assert.equal(b.el('btn-publish').disabled, false);
+  assert.equal(b.el('f-name').value, base.name); assert.equal(b.c.items.length, 0);
+  assert.match(b.el('notice').textContent, /先刷新列表核对/);
+  // 服务端可能已保存、只是响应丢失；用户刷新后能看到真正的结果。
+  b.c.fetch = async () => ({ ok: true, json: async () => [{ ...base, isOwner: true }] });
+  await b.c.reloadItems(); assert.equal(b.c.items.length, 1); assert.equal(timers.pending.size, 0);
+});
+test('更新超时不虚报成功，刷新后恢复服务端真实状态', async () => {
+  const timers = controlledTimers(), b = await boot({ raw: JSON.stringify([base]), timers });
+  b.c.shared = true; b.c.openDetail('old');
+  b.c.fetch = (url, options) => waitForAbort(options.signal);
+  const pending = b.c.markDone(); timers.expire(); assert.equal(await pending, false);
+  assert.equal(b.el('btn-done').disabled, false); assert.equal(b.el('d-status').textContent, '寻找中');
+  assert.equal(b.c.visiblePage, 'page-detail'); assert.match(b.el('notice').textContent, /刷新核对最新状态/);
+  b.c.fetch = async () => ({ ok: true, json: async () => [{ ...base, status: '已找到', isOwner: true }] });
+  await b.c.reloadItems(); assert.equal(b.el('d-status').textContent, '已找到'); assert.equal(b.el('btn-done').disabled, true);
+});
+test('读取超时后可再次刷新，成功和接口失败均清理计时器', async () => {
+  const timers = controlledTimers(), b = await boot({ timers }); b.c.shared = true;
+  b.c.fetch = (url, options) => waitForAbort(options.signal);
+  const pending = b.c.reloadItems(); timers.expire(); await pending;
+  assert.equal(b.c.refreshPromise, null); assert.equal(b.c.loading, false);
+  assert.match(b.el('notice').textContent, /读取失败.*超过 10 秒/); assert.equal(timers.pending.size, 0);
+  b.c.fetch = async () => ({ ok: true, json: async () => [] }); await b.c.reloadItems();
+  assert.equal(b.el('notice').hidden, true); assert.equal(timers.pending.size, 0);
+  b.c.fetch = async () => ({ ok: false, json: async () => ({ error: '只有原发布者可以更新状态' }) });
+  await assert.rejects(b.c.request('/api/items/old/status', 'PATCH', {}), /只有原发布者/);
+  assert.equal(timers.pending.size, 0);
+});
+test('响应头返回后响应体一直挂起也会超时', async () => {
+  const timers = controlledTimers(), b = await boot({ timers });
+  let started;
+  const bodyStarted = new Promise(resolve => { started = resolve; });
+  b.c.fetch = async (url, options) => ({ ok: true, json() { const pending = waitForAbort(options.signal); started(); return pending; } });
+  const pending = b.c.request('/api/items'); await bodyStarted;
+  timers.expire();
+  await assert.rejects(pending, error => error.name === 'RequestTimeoutError');
+  assert.equal(timers.pending.size, 0);
 });

@@ -4,6 +4,7 @@ var searchType = '全部', searchStatus = '全部', visiblePage = 'page-home';
 var shared = location.protocol === 'http:' || location.protocol === 'https:';
 var identity = '', storageError = false, visitor = false, loading = true;
 var busy = false, refreshPromise = null, Core = LostFound;
+var REQUEST_TIMEOUT_MS = 10000;
 function el(id) { return document.getElementById(id); }
 function notify(message) { el('notice').textContent = message; el('notice').hidden = !message; }
 function makeNode(tag, cls, text) {
@@ -18,14 +19,25 @@ function decorateLocal(data) {
 }
 function readLocal() { return decorateLocal(Core.parseItems(localStorage.getItem('lost_items'))); }
 async function request(path, method, data) {
-  var response = await fetch(path, {
-    method: method || 'GET', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'X-Publisher-Token': identity },
-    body: data === undefined ? undefined : JSON.stringify(data)
-  });
-  var result = await response.json();
-  if (!response.ok) throw new Error(result.error || '操作失败');
-  return result;
+  var controller = new AbortController();
+  var timer = setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS);
+  try {
+    var response = await fetch(path, {
+      method: method || 'GET', cache: 'no-store', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json', 'X-Publisher-Token': identity },
+      body: data === undefined ? undefined : JSON.stringify(data)
+    });
+    // 超时也覆盖响应体读取，避免只收到响应头后一直等待。
+    var result = await response.json();
+    if (!response.ok) throw new Error(result.error || '操作失败');
+    return result;
+  } catch (error) {
+    if (controller.signal.aborted) {
+      var timeout = new Error('请求超过 10 秒，请检查网络或服务');
+      timeout.name = 'RequestTimeoutError'; throw timeout;
+    }
+    throw error;
+  } finally { clearTimeout(timer); }
 }
 function persistLocal(next) {
   if (storageError) throw new Error('本地数据读取异常，已停止写入，请先按 README 备份并恢复数据');
@@ -172,7 +184,12 @@ async function doPublish() {
     if (shared) items = [published].concat(items);
     Object.keys(Core.limits).forEach(function (key) { el('f-' + key).value = ''; });
     homeTab = published.type; updateTabs(); refreshViews(); notify(''); show('page-success'); return published;
-  } catch (error) { notify('发布失败：' + error.message + '。输入已保留，请重试。'); return null; }
+  } catch (error) {
+    notify(error.name === 'RequestTimeoutError'
+      ? '发布结果未确认：' + error.message + '。输入已保留，请先刷新列表核对是否已发布，避免重复提交。'
+      : '发布失败：' + error.message + '。输入已保留，请重试。');
+    return null;
+  }
   finally { busy = false; updateControls(); }
 }
 async function markDone() {
@@ -193,7 +210,12 @@ async function markDone() {
       persistLocal(latest.map(function (x) { return x.id === item.id ? Object.assign({}, x, { status: status }) : x; }));
     }
     refreshViews(); el('done-title').textContent = '已标记为' + status; notify(''); show('page-done'); return true;
-  } catch (error) { notify('更新失败：' + error.message); return false; }
+  } catch (error) {
+    notify(error.name === 'RequestTimeoutError'
+      ? '更新结果未确认：' + error.message + '。请先刷新核对最新状态。'
+      : '更新失败：' + error.message);
+    return false;
+  }
   finally { busy = false; updateControls(); }
 }
 function setPublishType(type) {
