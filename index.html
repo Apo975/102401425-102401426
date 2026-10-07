@@ -9,6 +9,8 @@
 <body>
 <div class="phone">
 <div class="brand">拾物 · 校园失物招领</div>
+<div class="session-bar"><span id="mode-text">正在加载…</span><button id="visitor-toggle" type="button">访客预览</button><button id="refresh-items" type="button">刷新</button></div>
+<p id="notice" class="notice" role="status" aria-live="polite" hidden></p>
 
 <!-- 首页 -->
 <section id="page-home" class="page">
@@ -31,6 +33,7 @@
 <span class="list-sort">按发布时间排列</span>
 </div>
 <div id="list"></div>
+<label class="mine-toggle"><input id="my-only" type="checkbox"> 只看我的发布</label>
 
 <button class="btn-primary" id="home-publish">＋ 发布一条信息</button>
 
@@ -54,7 +57,6 @@
 <label class="fld"><span id="label-place">丢失地点</span><input id="f-place" placeholder="如：西一教学楼一楼走廊"></label>
 <label class="fld"><span id="label-time">丢失时间</span><input id="f-time" placeholder="如：9月26日 18:30"></label>
 <label class="fld">物品特征<textarea id="f-feature" rows="3" placeholder="如：黑色三折伞，伞柄有蓝色挂绳。"></textarea></label>
-<label class="fld">物品图片（选填）<div class="img-add">＋ 点击添加图片</div></label>
 <label class="fld">联系方式<input id="f-contact" placeholder="如：QQ 123456"></label>
 <button class="btn-primary" id="btn-publish">发布信息</button>
 <p class="hint">提交后展示成功反馈，信息加入最新列表</p>
@@ -81,6 +83,7 @@
 <button class="pill" data-v="进行中">进行中</button>
 <button class="pill" data-v="已处理">已处理</button>
 </div>
+<div class="select-filters"><label>物品类别<select id="filter-category"><option value="">全部</option></select></label><label>地点<select id="filter-place"><option value="">全部</option></select></label></div>
 <div class="tip-card" id="search-tip">
 <div class="tip-title"><span class="tip-icon">Q</span>找不到？试试换个关键词</div>
 <p class="tip-text">可以同时输入物品名称和地点，比如“水杯 图书馆”。</p>
@@ -99,10 +102,10 @@
 <!-- 详情页 -->
 <section id="page-detail" class="page" style="display:none">
 <div class="topbar"><button class="backbtn" data-go="page-home">‹</button><span class="toptitle">信息详情</span></div>
-<div class="img-place">物品图片放置处</div>
 <h2 id="d-name" class="d-name"></h2>
 <div class="d-pills"><span id="d-type" class="mini-pill blue"></span><span id="d-status" class="mini-pill green"></span></div>
 <div class="info-card">
+<div class="info-row"><span class="info-k">物品类别</span><span class="info-v" id="d-category"></span></div>
 <div class="info-row"><span class="info-k" id="d-k-place">拾获地点</span><span class="info-v" id="d-place"></span></div>
 <div class="info-row"><span class="info-k" id="d-k-time">拾获时间</span><span class="info-v" id="d-time"></span></div>
 <div class="info-div"></div>
@@ -110,6 +113,7 @@
 </div>
 <button class="btn-primary" id="btn-contact">联系发布者</button>
 <button class="btn-white" id="btn-done">标记为已归还</button>
+<p class="hint" id="owner-tip"></p>
 <button class="btn-ghost backbtn2" data-go="page-home">返回首页</button>
 </section>
 
@@ -144,6 +148,7 @@
 </section>
 
 </div>
+<script src="core.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
