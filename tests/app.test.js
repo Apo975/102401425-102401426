@@ -264,3 +264,36 @@ test('只看我的发布为空时提示取消筛选，不误报整个列表为�
   b.el('my-only').checked = true; b.c.renderList();
   assert.match(b.el('list').children[0].textContent, /取消“只看我的发布”/);
 });
+test('搜索详情返回保留全部搜索条件和原滚动位置', async () => {
+  const b = await boot({ raw: JSON.stringify([base]) });
+  b.c.window.scrollTo = (x, y) => { b.c.window.scrollY = y; };
+  b.el('s-keyword').value = '水杯'; b.c.searchType = '寻物'; b.c.searchStatus = '进行中';
+  b.el('filter-category').value = '日用品'; b.el('filter-place').value = '图书馆';
+  b.c.show('page-search'); b.c.window.scrollY = 180;
+  b.el('search-result').children[0].onclick();
+  assert.equal(b.c.visiblePage, 'page-detail'); assert.equal(b.c.window.scrollY, 0);
+  assert.equal(b.el('detail-return').textContent, '返回搜索结果');
+  b.el('detail-back').onclick();
+  assert.equal(b.c.visiblePage, 'page-search'); assert.equal(b.c.window.scrollY, 180);
+  assert.equal(b.el('s-keyword').value, '水杯'); assert.equal(b.c.searchType, '寻物'); assert.equal(b.c.searchStatus, '进行中');
+  assert.equal(b.el('filter-category').value, '日用品'); assert.equal(b.el('filter-place').value, '图书馆');
+  assert.equal(b.el('search-result').children.length, 1);
+});
+test('首页详情返回保留首页类型、我的发布筛选和原滚动位置', async () => {
+  const b = await boot({ raw: JSON.stringify([{ ...base, type: '招领', status: '待认领' }]) });
+  b.c.window.scrollTo = (x, y) => { b.c.window.scrollY = y; };
+  b.el('tab-found').onclick(); b.el('my-only').checked = true; b.c.renderList(); b.c.window.scrollY = 240;
+  b.el('list').children[0].onclick(); assert.equal(b.el('detail-return').textContent, '返回首页');
+  b.el('detail-return').onclick();
+  assert.equal(b.c.visiblePage, 'page-home'); assert.equal(b.c.window.scrollY, 240);
+  assert.equal(b.c.homeTab, '招领'); assert.equal(b.el('my-only').checked, true);
+});
+test('联系、刷新和状态更新不会覆盖详情来源，返回搜索时重新应用筛选', async () => {
+  const b = await boot({ raw: JSON.stringify([base]) });
+  b.c.window.scrollTo = (x, y) => { b.c.window.scrollY = y; };
+  b.c.searchStatus = '进行中'; b.c.show('page-search'); b.c.window.scrollY = 120; b.c.openDetail('old');
+  b.c.doContact(); await b.c.reloadItems(); b.c.show('page-detail');
+  assert.equal(await b.c.markDone(), true); b.c.show('page-detail'); b.el('detail-return').onclick();
+  assert.equal(b.c.visiblePage, 'page-search'); assert.equal(b.c.window.scrollY, 120);
+  assert.equal(b.c.searchStatus, '进行中'); assert.equal(b.el('search-result').children.length, 0);
+});

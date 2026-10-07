@@ -1,6 +1,7 @@
 'use strict';
 var items = [], currentType = '寻物', homeTab = '寻物', currentId = null;
 var searchType = '全部', searchStatus = '全部', visiblePage = 'page-home';
+var detailOrigin = { page: 'page-home', scrollY: 0 };
 var shared = location.protocol === 'http:' || location.protocol === 'https:';
 var identity = '', storageError = false, visitor = false, loading = true;
 var dataLoadFailed = false;
@@ -131,6 +132,7 @@ function renderDetail() {
   el('d-category').textContent = item.category || '未填写'; el('d-feature').textContent = item.feature || '未填写';
   el('btn-done').textContent = isDone(item) ? '已处理' : item.type === '寻物' ? '标记为已找到' : '标记为已归还';
   el('owner-tip').textContent = owns(item) ? '这是你的发布，你可以更新处理状态。' : '只有原发布者可以更新状态。';
+  el('detail-return').textContent = detailOrigin.page === 'page-search' ? '返回搜索结果' : '返回首页';
   updateControls(); return true;
 }
 function refreshViews() {
@@ -144,14 +146,20 @@ function refreshViews() {
   }
   updateControls();
 }
-function show(id) {
+function show(id, scrollY) {
   if (id === 'page-detail' && !renderDetail()) return;
   if (id === 'page-search') doSearch();
   if (id === 'page-home') renderList();
   document.querySelectorAll('.page').forEach(function (page) { page.style.display = page.id === id ? 'block' : 'none'; });
-  visiblePage = id; window.scrollTo(0, 0);
+  visiblePage = id; window.scrollTo(0, scrollY === undefined ? 0 : scrollY);
 }
-function openDetail(id) { currentId = String(id); show('page-detail'); }
+function openDetail(id) {
+  if (visiblePage === 'page-home' || visiblePage === 'page-search') {
+    detailOrigin = { page: visiblePage, scrollY: window.scrollY || 0 };
+  }
+  currentId = String(id); show('page-detail');
+}
+function returnFromDetail() { show(detailOrigin.page, detailOrigin.scrollY); }
 function doContact() {
   var item = items.find(function (x) { return x.id === currentId; });
   if (!item) { notify('信息已不存在'); return; }
@@ -258,6 +266,7 @@ el('home-publish').onclick = function () { setPublishType(homeTab); show('page-p
 el('hero-search').onclick = function () { show('page-search'); };
 el('btn-publish').onclick = doPublish; el('btn-search').onclick = doSearch; el('btn-contact').onclick = doContact;
 el('btn-copy').onclick = copyContact; el('btn-done').onclick = markDone;
+el('detail-back').onclick = returnFromDetail; el('detail-return').onclick = returnFromDetail;
 el('btn-again').onclick = function () { show('page-publish'); }; el('my-only').onchange = renderList;
 el('filter-category').onchange = doSearch; el('filter-place').onchange = doSearch;
 el('reset-search').onclick = resetSearch;
