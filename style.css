@@ -102,7 +102,7 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #e
 .session-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 8px 20px 12px; color: #687385; font-size: 12px; }
 .session-bar span { flex: 1; }
 .session-bar button { border: 1px solid #dbe3ef; border-radius: 8px; padding: 6px 8px; background: white; color: #1a73e8; cursor: pointer; }
-.notice { margin: 8px 20px 12px; padding: 12px; border-radius: 10px; background: #fff4dc; color: #704c05; font-size: 13px; overflow-wrap: anywhere; }
+.notice { position: fixed; bottom: calc(96px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: min(88%, 380px); margin: 0; padding: 12px 16px; border-radius: 12px; background: rgba(31,45,61,.92); color: #fff; font-size: 13px; overflow-wrap: anywhere; z-index: 50; box-shadow: 0 4px 16px rgba(16,24,40,.25); }
 .mine-toggle { display: block; font-size: 13px; color: #5b6b82; margin: 10px 0; }
 .select-filters { display: flex; gap: 12px; margin: 16px 0; }
 .select-filters label { flex: 1; min-width: 0; font-size: 14px; color: #5b6b82; }

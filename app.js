@@ -8,7 +8,10 @@ var dataLoadFailed = false;
 var busy = false, refreshPromise = null, Core = LostFound;
 var REQUEST_TIMEOUT_MS = 10000;
 function el(id) { return document.getElementById(id); }
-function notify(message) { el('notice').textContent = message; el('notice').hidden = !message; }
+var noticeTimer = null;
+function notify(message, sticky) { el('notice').textContent = message; el('notice').hidden = !message;
+  if (noticeTimer) { clearTimeout(noticeTimer); noticeTimer = null; }
+  if (message && !sticky) noticeTimer = setTimeout(function () { el('notice').hidden = true; noticeTimer = null; }, 2500); }
 function makeNode(tag, cls, text) {
   var node = document.createElement(tag); node.className = cls || '';
   if (text !== undefined) node.textContent = text;
@@ -184,11 +187,11 @@ async function reloadItems() {
     try {
       items = shared ? await request('/api/items') : readLocal();
       storageError = false; dataLoadFailed = false; loading = false; refreshViews();
-      if (el('notice').textContent.startsWith('读取失败')) notify('');
+      if (el('notice').textContent.indexOf('读取失败') === 0) notify('');
     } catch (error) {
       dataLoadFailed = true;
       if (!shared) storageError = true;
-      notify('读取失败：' + error.message + '。原数据未覆盖，请检查服务或按 README 恢复。');
+      notify('读取失败：' + error.message + '。原数据未覆盖，请检查服务或按 README 恢复。', true);
     } finally { loading = false; renderList(); doSearch(); updateControls(); }
   })();
   try { await refreshPromise; } finally { refreshPromise = null; }
@@ -300,6 +303,6 @@ var appReady = (async function () {
       localStorage.setItem('lost_publisher_token', identity);
     }
     await reloadItems();
-  } catch (error) { loading = false; storageError = true; notify('浏览器存储不可用：' + error.message); updateControls(); }
+  } catch (error) { loading = false; storageError = true; notify('浏览器存储不可用：' + error.message, true); updateControls(); }
 })();
 if (shared) setInterval(function () { if (!document.hidden) reloadItems(); }, 5000);

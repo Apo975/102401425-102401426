@@ -181,7 +181,11 @@ function controlledTimers() {
   const pending = new Map(); let sequence = 0;
   return {
     pending,
-    setTimeout(callback, delay) { assert.equal(delay, 10000); const id = ++sequence; pending.set(id, callback); return id; },
+    setTimeout(callback, delay) {
+      assert.ok(delay === 10000 || delay === 2500);
+      if (delay !== 10000) return 9000 + sequence;
+      const id = ++sequence; pending.set(id, callback); return id;
+    },
     clearTimeout(id) { pending.delete(id); },
     expire() { assert.equal(pending.size, 1); pending.values().next().value(); }
   };
