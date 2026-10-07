@@ -57,6 +57,8 @@ body { font-family: "PingFang SC", "Microsoft YaHei", sans-serif; background: #e
 .seg-btn.active { background: #e4ecfd; color: #1a73e8; border-color: #e4ecfd; font-weight: 800; }
 .fld { display: block; margin: 12px 0; color: #5b6b82; font-size: 14px; }
 .fld input, .fld textarea { width: 100%; margin-top: 6px; border: 1px solid #e3e9f2; border-radius: 12px; padding: 12px 14px; font-size: 15px; background: #fff; color: #1f2d3d; }
+.required-mark { color: #c63c32; }
+.field-hint { display: block; margin-top: 5px; color: #687385; font-size: 12px; }
 
 /* 搜索 */
 .searchbar { display: flex; background: #fff; border-radius: 12px; padding: 6px 6px 6px 14px; align-items: center; gap: 8px; }
