@@ -37,6 +37,9 @@ function persistLocal(next) {
 }
 function updateControls() {
   el('btn-publish').disabled = loading || busy || storageError || visitor || !identity;
+  Object.keys(Core.limits).forEach(function (key) { el('f-' + key).disabled = busy; });
+  el('seg-lost').disabled = busy;
+  el('seg-found').disabled = busy;
   el('mode-text').textContent = (shared ? '共享服务模式' : '本地演示模式（仅此浏览器）') + (visitor ? ' · 访客预览' : ' · 当前发布者');
   el('visitor-toggle').textContent = visitor ? '返回发布者' : '访客预览';
   el('visitor-toggle').disabled = loading || busy;
@@ -157,12 +160,12 @@ async function doPublish() {
     else {
       var latest = readLocal();
       published = Object.assign(Core.normalizePublish(data), { id: crypto.randomUUID(), ownerId: identity,
-        createdAt: Date.now(), status: currentType === '寻物' ? '寻找中' : '待认领', isOwner: true });
+        createdAt: Date.now(), status: data.type === '寻物' ? '寻找中' : '待认领', isOwner: true });
       persistLocal([published].concat(latest));
     }
     if (shared) items = [published].concat(items);
     Object.keys(Core.limits).forEach(function (key) { el('f-' + key).value = ''; });
-    homeTab = currentType; updateTabs(); refreshViews(); notify(''); show('page-success'); return published;
+    homeTab = published.type; updateTabs(); refreshViews(); notify(''); show('page-success'); return published;
   } catch (error) { notify('发布失败：' + error.message + '。输入已保留，请重试。'); return null; }
   finally { busy = false; updateControls(); }
 }
@@ -188,6 +191,7 @@ async function markDone() {
   finally { busy = false; updateControls(); }
 }
 function setPublishType(type) {
+  if (busy) return;
   currentType = type; var lost = type === '寻物';
   el('publish-title').textContent = lost ? '发布寻物' : '发布招领';
   el('seg-lost').className = 'seg-btn' + (lost ? ' active' : ''); el('seg-found').className = 'seg-btn' + (!lost ? ' active' : '');

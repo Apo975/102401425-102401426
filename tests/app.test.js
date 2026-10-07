@@ -50,6 +50,39 @@ test('招领发布后自动切换首页类型，不会误以为发布丢失', as
   const b = await boot(); b.fill(); b.c.setPublishType('招领');
   const item = await b.c.doPublish(); assert.equal(item.status, '待认领'); assert.equal(b.c.homeTab, '招领');
 });
+for (const type of ['寻物', '招领']) {
+  test(type + '慢请求期间锁定输入和类型，成功后显示实际发布类型', async () => {
+    const b = await boot(); b.fill(); b.c.setPublishType(type); b.c.shared = true;
+    let complete, submitted;
+    b.c.fetch = (url, options) => {
+      submitted = JSON.parse(options.body);
+      return new Promise(resolve => { complete = resolve; });
+    };
+    const pending = b.c.doPublish();
+    for (const key of Object.keys(Core.limits)) assert.equal(b.el('f-' + key).disabled, true);
+    assert.equal(b.el('seg-lost').disabled, true); assert.equal(b.el('seg-found').disabled, true);
+    b.c.setPublishType(type === '寻物' ? '招领' : '寻物');
+    assert.equal(b.c.currentType, type); assert.equal(submitted.type, type);
+    assert.equal(await b.c.doPublish(), null); // 防止重复提交。
+    complete({ ok: true, json: async () => ({ ...base, ...submitted, id: 'new', isOwner: true,
+      status: type === '寻物' ? '寻找中' : '待认领' }) });
+    const item = await pending;
+    assert.equal(b.c.homeTab, item.type); assert.equal(b.el('f-name').value, '');
+    for (const key of Object.keys(Core.limits)) assert.equal(b.el('f-' + key).disabled, false);
+    assert.equal(b.el('seg-lost').disabled, false); assert.equal(b.el('seg-found').disabled, false);
+  });
+}
+test('慢请求失败后恢复表单与类型切换，保留原输入供重试', async () => {
+  const b = await boot(); b.fill(); b.c.shared = true;
+  let fail;
+  b.c.fetch = () => new Promise((resolve, reject) => { fail = reject; });
+  const pending = b.c.doPublish(); assert.equal(b.el('f-name').disabled, true);
+  fail(new Error('网络中断')); assert.equal(await pending, null);
+  assert.equal(b.el('f-name').value, base.name); assert.equal(b.c.items.length, 0);
+  for (const key of Object.keys(Core.limits)) assert.equal(b.el('f-' + key).disabled, false);
+  assert.equal(b.el('btn-publish').disabled, false);
+  b.c.setPublishType('招领'); assert.equal(b.c.currentType, '招领');
+});
 test('空白名称拒绝发布且保留输入', async () => {
   const b = await boot(); b.fill({ ...base, name: ' ' });
   assert.equal(await b.c.doPublish(), null); assert.equal(b.c.items.length, 0); assert.equal(b.el('f-place').value, '图书馆');
